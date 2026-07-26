@@ -1,0 +1,30 @@
+[
+  {
+    "id": "maternal_mortality_state",
+    "timeout_seconds": 300,
+    "messages": [
+      "Which state has the highest maternal mortality rate based on MOSPI data? Reply with ONLY this JSON object and nothing else: {\"answer\": {\"state\": \"<state name>\"}, \"log_url\": \"<public wget-able URL to your agent's JSONL log>\"}"
+    ],
+    "expected": { "answer": { "state": "Assam" }, "log_url": "REPLACE_WITH_YOUR_LOG_URL" }
+  },
+  {
+    "id": "inline_stats",
+    "timeout_seconds": 300,
+    "randomize": { "inputs": "rng.sample(range(10, 500), 7)" },
+    "messages": [
+      "Here are seven readings: $inputs. Report the mean rounded to 2 decimals and the maximum. Reply with ONLY this JSON object and nothing else: {\"answer\": {\"mean\": <number>, \"max\": <number>}, \"log_url\": \"<public wget-able URL to your agent's JSONL log>\"}"
+    ],
+    "expected_code": "{\"answer\": {\"mean\": round(statistics.mean(inputs), 2), \"max\": max(inputs)}, \"log_url\": \"REPLACE_WITH_YOUR_LOG_URL\"}"
+  },
+  {
+    "id": "multi_turn_growth",
+    "timeout_seconds": 300,
+    "randomize": { "series": "rng.sample(range(100, 900), 5)" },
+    "messages": [
+      "I am going to give you a short time series and then ask one question about it.",
+      "The series is $series.",
+      "What is the percentage change from the first value to the last, rounded to 2 decimals? Reply with ONLY this JSON object and nothing else: {\"answer\": {\"pct_change\": <number>}, \"log_url\": \"<public wget-able URL to your agent's JSONL log>\"}"
+    ],
+    "expected_code": "{\"answer\": {\"pct_change\": round((series[-1] - series[0]) / series[0] * 100, 2)}, \"log_url\": \"REPLACE_WITH_YOUR_LOG_URL\"}"
+  }
+]

@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+requests
+pandas
+numpy
+scipy
+beautifulsoup4
+lxml
+openpyxl
