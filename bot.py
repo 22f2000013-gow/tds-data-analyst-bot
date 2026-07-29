@@ -131,21 +131,42 @@ Rules:
 
 
 # ---------------------------------------------------------------- llm
+ROUTES = [
+    (os.environ.get("OPENAI_API_KEY", ""), "https://api.openai.com/v1",        MODEL),
+    (AIPIPE_TOKEN,                         "https://aipipe.org/openai/v1",     MODEL),
+    (AIPIPE_TOKEN,                         "https://aipipe.org/openrouter/v1", "openai/" + MODEL),
+]
+
+
 def chat_completion(messages, use_tools=True):
-    body = {"model": MODEL, "messages": messages, "temperature": 0}
+    body = {"messages": messages, "temperature": 0}
     if use_tools:
         body["tools"] = TOOLS
-    r = requests.post(
-        f"{MODEL_BASE_URL}/chat/completions",
-        headers={
-            "Authorization": f"Bearer {AIPIPE_TOKEN}",
-            "Content-Type": "application/json",
-        },
-        json=body,
-        timeout=180,
-    )
-    r.raise_for_status()
-    return r.json()["choices"][0]["message"]
+    last = None
+    for token, base, model in ROUTES:
+        if not token:
+            continue
+        body["model"] = model
+        for attempt in range(3):
+            try:
+                r = requests.post(
+                    f"{base}/chat/completions",
+                    headers={"Authorization": f"Bearer {token}"},
+                    json=body,
+                    timeout=180,
+                )
+                if r.status_code == 429:
+                    log_event(event="rate_limited", base=base, attempt=attempt, body=r.text[:300])
+                    time.sleep(5 * 2 ** attempt)
+                    continue
+                if r.status_code >= 400:
+                    log_event(event="api_error", base=base, status=r.status_code, body=r.text[:300])
+                    r.raise_for_status()
+                return r.json()["choices"][0]["message"]
+            except Exception as e:
+                last = e
+                time.sleep(2)
+    raise last or RuntimeError("no usable route")
 
 
 # ---------------------------------------------------------------- json shaping
@@ -263,7 +284,7 @@ def solve(chat_id: int, question: str) -> str:
 
     obj = extract_json(final_text)
     if obj is None:
-        obj = {"answer": (final_text or "unable to determine").strip()[:1000]}
+        obj = {"answer": (final_text or "llm unavailable").strip()[:1000]}
     reply = json.dumps(shape_reply(obj, question), ensure_ascii=False)
 
     with _hist_lock:
@@ -349,7 +370,12 @@ app = FastAPI(lifespan=lifespan)
 
 @app.get("/health")
 def health():
-    return {"ok": True, "model": MODEL, "log_url": LOG_URL}
+    try:
+        chat_completion([{"role": "user", "content": "say ok"}], use_tools=False)
+        llm = "ok"
+    except Exception as e:
+        llm = str(e)[:200]
+    return {"ok": True, "model": MODEL, "llm": llm, "log_url": LOG_URL}
 
 
 @app.get("/run.jsonl")
