@@ -139,7 +139,7 @@ ROUTES = [
 
 
 def chat_completion(messages, use_tools=True):
-    body = {"messages": messages, "temperature": 0}
+    body = {"messages": messages}
     if use_tools:
         body["tools"] = TOOLS
     last = None
